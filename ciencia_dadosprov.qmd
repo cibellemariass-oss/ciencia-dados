@@ -1,0 +1,124 @@
+---
+title: "Análise do PIB por Unidade da Federação"
+format: html
+
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+# Introdução
+
+Este trabalho utiliza dados do SIDRA e do pacote geobr para visualizar o Produto Interno Bruto (PIB) das Unidades da Federação brasileiras por meio de uma tabela, um gráfico e um mapa.
+
+# Carregamento dos pacotes e obtenção dos dados
+
+```{r}
+
+library(readr)
+library(tidyverse)
+library(sidrar)
+library(geobr)
+library(sf)
+library(ggplot2)
+library(dplyr)
+
+# dados SIDRA
+pib <- get_sidra(
+ api="/t/5938/n3/all/v/37/p/last"
+)
+
+# selecionar variáveis
+pib <- pib %>%
+ select(
+   uf_codigo=`Unidade da Federação (Código)`,
+   uf_nome=`Unidade da Federação`,
+   valor=Valor
+ )
+
+# ajustar identificador
+pib$uf_codigo <- as.numeric(
+ pib$uf_codigo
+)
+
+```
+
+# Tabela
+
+Primeiros registros obtidos na base do SIDRA:
+
+```{r}
+
+knitr::kable(
+  head(as.data.frame(pib),6),
+  row.names=FALSE,
+  caption="Primeiros registros do PIB por Unidade da Federação"
+)
+
+```
+
+# Gráfico
+
+As dez Unidades da Federação com maiores valores do PIB.
+
+```{r}
+
+top10 <- pib %>%
+ arrange(desc(valor)) %>%
+ slice(1:10)
+
+ggplot(
+ top10,
+ aes(
+   x=reorder(uf_nome,valor),
+   y=valor/1000000000
+ )
+)+
+geom_col()+
+coord_flip()+
+labs(
+ title="10 maiores PIBs por UF",
+ x="Estado",
+ y="PIB (em bilhões de R$)"
+)+
+theme_minimal()
+
+```
+
+# Mapa
+
+Mapa do PIB por Unidade da Federação.
+
+```{r}
+
+mapa <- geobr::read_state(
+ year=2019
+)
+
+mapa$code_state <- as.numeric(
+ mapa$code_state
+)
+
+mapa_final <- dplyr::left_join(
+ x=mapa,
+ y=pib,
+ by=c(
+   "code_state"="uf_codigo"
+ )
+)
+
+ggplot()+
+geom_sf(
+ data=mapa_final,
+ aes(fill=valor),
+ color="white",
+ linewidth=.2
+)+
+scale_fill_viridis_c()+
+labs(
+ title="PIB por Unidade da Federação"
+)+
+theme_minimal()
+
+```
